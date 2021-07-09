@@ -8,12 +8,13 @@ def fn_init(Kernel, Ker_weights, range):
         return fn(inputs, val, Kernel, Ker_weights, range)
     return fn_with_specified_args
 
-def fn(inputs, val, Kernel, Ker_weights, range):
+def fn(inputs, val, Kernel, Ker_weights, rkhs_range):
   fn_at_val = 0
   N = len(inputs)
+
   for i in range(N):
     x_i = inputs[i]
-    fn_at_val += Ker_weights[i].matmul(Kernel(x_i, val, range, True).T)
+    fn_at_val += Ker_weights[i].matmul(Kernel(x_i, val, rkhs_range, True).T)
   return fn_at_val
 
 def lazy_fn(fn, inputs):

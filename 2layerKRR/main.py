@@ -3,7 +3,6 @@ import numpy as np
 
 num_data_points = 100
 X = torch.ones(num_data_points, 1)
-X = 
 
 def concat_kernel_learning(X, Y, K2, K1, Loss):
     """

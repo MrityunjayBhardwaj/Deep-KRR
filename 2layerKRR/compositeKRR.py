@@ -11,10 +11,11 @@ class CompositeKernelRegression(nn.Module):
         # specify kernels for each layers.
         self.K2 = polyKernel
         self.K1 = polyKernel
+        self.N = len(inputs)
 
         # specify the weights for each layers.
-        self.K1_weights = torch.randn([domains[0], 1, ranges[1]], requires_grad=True) 
-        self.K2_weights = torch.randn([domains[0], 1, ranges[0]], requires_grad=True) 
+        self.K1_weights = torch.randn([self.N, 1, ranges[1]], requires_grad=True) 
+        self.K2_weights = torch.randn([self.N, 1, ranges[0]], requires_grad=True) 
 
         # specify the function at each kernel layer.
         self.fn2 = fn_init(self.K2, self.K2_weights, ranges[0])
