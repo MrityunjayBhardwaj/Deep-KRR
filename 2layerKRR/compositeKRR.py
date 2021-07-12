@@ -4,16 +4,6 @@ import torch.nn as nn
 import gpytorch as gpy
 import torchviz
 
-Vectorized all the calculation of compositeKRR
-
-* vectorized main calculation, removing all the loops and serialized
-  calcuation.
-* Assuming kernel fn is coming from gpytorch library.
-* removing the preprocessing step in compose function to fix the
-  computation graph and unnecessary dual calculation.
-* no calculation takes place before calling return function of the
-    compose fn.
-
 class CompositeKernelRegression(nn.Module):
     def __init__(self, ranges, inputs, device="cpu"):
         """
