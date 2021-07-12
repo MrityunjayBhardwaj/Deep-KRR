@@ -1,7 +1,7 @@
 from compositeKRR import CompositeKernelRegression
 import torch
 import torch.nn as nn
-
+import torchviz
 
 def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100):
     for epoch in range(num_epochs):
@@ -14,9 +14,15 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100):
       loss.backward(retain_graph=True)
       optimizer.step()
 
-      if epoch % 1 == 0:
+      if(loss < 1):
+          print('converged! ', loss)
+          return True
+
+      if epoch % (1000 + 0*num_epochs) == 0:
         loss = loss.item()
         print(f"{ epoch } loss: {loss:>7f}]")
+
+
 
 def createSyntheticData():
     #following the defination specified in the paper.
@@ -68,18 +74,53 @@ def createSyntheticData():
 
 
 def main():
-    # hyperparams
-    learning_rate = 0.0001
-    num_epochs = 100
 
-    # TODO: specify the data.
-    domains,ranges,data_x,data_y = createSyntheticData()
+    # check for cuda
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    #device = 'cpu'
+    print('Using {} device'.format(device))
+
+    # hyperparams
+    learning_rate = 0.0005
+    num_epochs = 100000
+
+
+    # specify the data.
+    _,ranges,data_x,data_y = createSyntheticData()
+    data_x = data_x.to(device)
+    data_y = data_y.to(device)
+
+    print('data_x.device: ', data_x.device, device)
 
     # initializing the main training loop components.
-    model = CompositeKernelRegression(domains, ranges, data_x) # TODO: specify the args
+    model = CompositeKernelRegression(ranges, data_x, device) # TODO: specify the args
+    model = model.to(device)
+
+    predY = model(data_x)
+
+    print(predY.sum().shape, model.named_parameters())
+
+    print(model.parameters()[0].is_leaf, model.parameters()[1].is_leaf)
+
+    p = torchviz.make_dot(predY.sum(), params=dict({"K1_weights":model.parameters()[0], 
+                                                    "K2_weights": model.parameters()[1] }),
+                          show_attrs=True)
+
+    p.render('somefile.gv', view=True)
+
     loss = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
+
     train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
+
+    predY = model(data_x)
+
+    #print(predY, data_y)
+
+    del data_x
+    del data_y
+    del model
+    torch.cuda.empty_cache()
 
 main()
