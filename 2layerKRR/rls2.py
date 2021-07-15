@@ -14,7 +14,7 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100):
       optimizer.zero_grad()
       # Compute prediction and loss
       pred = model(data_x)
-      loss = -loss_fn(pred, data_y)
+      loss = loss_fn(pred, data_y)
       loss.backward()
       optimizer.step()
 
@@ -85,6 +85,7 @@ def train_4gpy(train_x, train_y, model, likelihood,device, num_epochs ):
 # "Loss" for GPs - the marginal log likelihood
     mll = gpy.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
+    train_y = train_y.squeeze(1)
     for i in range(training_iter):
         # Zero gradients from previous iteration
         optimizer.zero_grad()
@@ -93,11 +94,13 @@ def train_4gpy(train_x, train_y, model, likelihood,device, num_epochs ):
         # Calc loss and backprop gradients
         loss = -mll(output, train_y)
         loss.backward()
-        print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
-            i + 1, training_iter, loss.item(),
-            model.covar_module.base_kernel.lengthscale.item(),
-            model.likelihood.noise.item()
-        ))
+
+        if i % 1000:
+          print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
+              i + 1, training_iter, loss.item(),
+              model.covar_module.base_kernel.lengthscale.item(),
+              model.likelihood.noise.item()
+          ))
         optimizer.step()
 def e2eSKRR(data_x, data_y, device, num_epochs=100):
     # TODO: create single layer KRR
@@ -130,7 +133,7 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
 
     # check for cuda
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #device = 'cpu'
+    device = 'cpu'
     print('Using {} device'.format(device))
 
 
@@ -139,16 +142,20 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
 
     data_x = data_x.to(device)
     data_y = data_y.to(device)
-    model = e2eKRR(data_x, data_y, ranges, device, num_epochs);
+    model = e2eKRR(data_x, data_y, ranges, device, num_epochs*0 + 1000);
+    model_s = e2eSKRR(data_x, data_y, device, num_epochs*0 + 100);
+
+    # Calculate the predictions.
+    pred_y = model(data_x)
+    pred_y_s = model_s(data_x).mean
 
     # calculating the loss at each point.
-    pred_y = model(data_x)
-
-    #data_y.to(device)
     loss = torch.abs(pred_y - data_y)
+    loss_s = torch.abs(pred_y_s - data_y.squeeze(1)).unsqueeze(1)
 
     # preparing data for visualization.
     l = loss.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+    l2 = loss_s.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
     data_x_grid = data_x.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
 
     dx1 = dx2 = data_x_grid[:, :, 1][:1, :].squeeze().cpu().detach().numpy()
@@ -158,6 +165,7 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
     fig = go.Figure(data=go.Contour(z=l,x=dx1,y=dx2))
 
     fig = make_subplots(rows=1, cols=2, subplot_titles=['', ''])
+    fig.add_trace(go.Contour(z=l2,x=dx1,y=dx2))
     fig.add_trace(go.Contour(z=l,x=dx1,y=dx2))
 
 
@@ -168,7 +176,6 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
     del model
     del dx1
 
-    
 def vizLossLandscape(loss, x, y, z):
     """
     dim(data_x) = 2
@@ -194,14 +201,16 @@ def main2(num_epochs=100):
     print('Using {} device'.format(device))
     _,ranges,data_x,data_y = createSyntheticData()
 
-# Training data is 100 points in [0,1] inclusive regularly spaced
+    # Training data is 100 points in [0,1] inclusive regularly spaced
     #data_x = torch.linspace(0, 1, 100)
-# True function is sin(2*pi*x) with Gaussian noise
+
+    # True function is sin(2*pi*x) with Gaussian noise
     #data_y = torch.sin(data_x * (2 * math.pi)) + torch.randn(data_x.size()) * math.sqrt(0.04)
+
     print('data shape: ', data_x.shape, data_y.shape)
     return e2eSKRR(data_x,data_y,device,num_epochs)
 
-main2()
+# main2()
 def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
 
     # hyperparams
@@ -234,7 +243,6 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
     loss = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-
     train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
 
     #predY = model(data_x)
@@ -249,3 +257,6 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
 
 #repr_fig3()
 #main(nEpochs)
+
+repr_fig3()
+    

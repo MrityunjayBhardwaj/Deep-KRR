@@ -14,8 +14,10 @@ class SingleLayerKRR(gpy.models.ExactGP):
 
     def forward(self, X):
         mean_x = self.mean_module(X)
+        #mean_x = mean_x.unsqueeze(1)
         covar_x = self.covar_module(X)
         return gpy.distributions.MultivariateNormal(mean_x, covar_x)
+        
 
 class CompositeKernelRegression(nn.Module):
     def __init__(self, ranges, inputs, device="cpu"):
