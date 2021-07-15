@@ -1,0 +1,15 @@
+{
+  "configurations": {
+    "test": {
+      "adapter": "debugpy",
+      "configuration": {
+        "name": "run RLS2 Experiment",
+        "type": "python",
+        "request": "launch",
+        "python.pythonPath": "~/miniconda3/envs/research/bin/python",
+        "program": "~/Documents/research/concatML/2layerKRR/rls2.py",
+        "stopAtEntry": true
+      }
+    }
+  }
+}

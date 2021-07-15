@@ -1,19 +1,21 @@
-from compositeKRR import CompositeKernelRegression
+from compositeKRR import CompositeKernelRegression, SingleLayerKRR
+import math
 import torch
 import torch.nn as nn
 import torchviz
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import gpytorch as gpy
 
 def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100):
     for epoch in range(num_epochs):
-      # Compute prediction and loss
-      pred = model(data_x)
-      loss = loss_fn(pred, data_y)
 
       # Backpropagation
       optimizer.zero_grad()
-      loss.backward(retain_graph=True)
+      # Compute prediction and loss
+      pred = model(data_x)
+      loss = -loss_fn(pred, data_y)
+      loss.backward()
       optimizer.step()
 
       if(loss < 1):
@@ -70,8 +72,58 @@ def createSyntheticData(num_data_points=10):
     ranges  = [2, 1]
 
     return [domains, ranges, x_grid, output_1]
+def train_4gpy(train_x, train_y, model, likelihood,device, num_epochs ):
 
-def repr_fig3(num_data_points=45,num_epochs=10000):
+    training_iter = num_epochs
+    # Find optimal model hyperparameters
+    model.train()
+    likelihood.train()
+
+# Use the adam optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)  # Includes GaussianLikelihood parameters
+
+# "Loss" for GPs - the marginal log likelihood
+    mll = gpy.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+    for i in range(training_iter):
+        # Zero gradients from previous iteration
+        optimizer.zero_grad()
+        # Output from model
+        output = model(train_x)
+        # Calc loss and backprop gradients
+        loss = -mll(output, train_y)
+        loss.backward()
+        print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
+            i + 1, training_iter, loss.item(),
+            model.covar_module.base_kernel.lengthscale.item(),
+            model.likelihood.noise.item()
+        ))
+        optimizer.step()
+def e2eSKRR(data_x, data_y, device, num_epochs=100):
+    # TODO: create single layer KRR
+
+    learning_rate = 0.0005
+
+    # data_to_device
+    data_x = data_x.to(device)
+    data_y = data_y.to(device)
+
+    likelihood = gpy.likelihoods.GaussianLikelihood()
+    model = SingleLayerKRR(data_x,data_y, likelihood).to(device)
+
+    print('SKRR params: ', model.parameters())
+
+    loss = gpy.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    #train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
+    train_4gpy(data_x, data_y, model, likelihood, device, num_epochs)
+
+    predY = model(data_x)
+    print('predY from SKRR: ', predY)
+
+    return model
+
+def repr_fig3(num_data_points=5,num_epochs=10000):
     """
     Reproducing the result shown in figure3
     """
@@ -105,6 +157,10 @@ def repr_fig3(num_data_points=45,num_epochs=10000):
 
     fig = go.Figure(data=go.Contour(z=l,x=dx1,y=dx2))
 
+    fig = make_subplots(rows=1, cols=2, subplot_titles=['', ''])
+    fig.add_trace(go.Contour(z=l,x=dx1,y=dx2))
+
+
     fig.show()
 
     del data_x
@@ -125,11 +181,27 @@ def vizLossLandscape(loss, x, y, z):
 
 
 def main(num_epochs=100):
+    # check for cuda
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print('Using {} device'.format(device))
     _,ranges,data_x,data_y = createSyntheticData()
-    return e2eKRR( data_x, data_y, ranges, num_epochs)
+    return e2eKRR( data_x, data_y, ranges, device, num_epochs)
 
+def main2(num_epochs=100):
+    # check for cuda
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cpu'
+    print('Using {} device'.format(device))
+    _,ranges,data_x,data_y = createSyntheticData()
 
+# Training data is 100 points in [0,1] inclusive regularly spaced
+    #data_x = torch.linspace(0, 1, 100)
+# True function is sin(2*pi*x) with Gaussian noise
+    #data_y = torch.sin(data_x * (2 * math.pi)) + torch.randn(data_x.size()) * math.sqrt(0.04)
+    print('data shape: ', data_x.shape, data_y.shape)
+    return e2eSKRR(data_x,data_y,device,num_epochs)
 
+main2()
 def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
 
     # hyperparams
@@ -147,9 +219,9 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
     model = CompositeKernelRegression(ranges, data_x, device) # TODO: specify the args
     model = model.to(device)
 
-    predY = model(data_x)
+    #predY = model(data_x)
 
-    print(predY.sum().shape, model.named_parameters())
+    #print(predY.sum().shape, model.named_parameters())
 
     print(model.parameters()[0].is_leaf, model.parameters()[1].is_leaf)
 
@@ -165,7 +237,7 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
 
     train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
 
-    predY = model(data_x)
+    #predY = model(data_x)
 
     #print(predY, data_y)
 
@@ -175,5 +247,5 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
     torch.cuda.empty_cache()
     return model
 
-repr_fig3()
+#repr_fig3()
 #main(nEpochs)

@@ -4,6 +4,19 @@ import torch.nn as nn
 import gpytorch as gpy
 import torchviz
 
+class SingleLayerKRR(gpy.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood):
+        super(SingleLayerKRR, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpy.means.ConstantMean()
+        #self.covar_module = gpy.lazy.ZeroLazyTensor(train_x.size())
+        #self.covar_module  = gpy.kernels.PolynomialKernel(2)
+        self.covar_module = gpy.kernels.ScaleKernel(gpy.kernels.RBFKernel())
+
+    def forward(self, X):
+        mean_x = self.mean_module(X)
+        covar_x = self.covar_module(X)
+        return gpy.distributions.MultivariateNormal(mean_x, covar_x)
+
 class CompositeKernelRegression(nn.Module):
     def __init__(self, ranges, inputs, device="cpu"):
         """
