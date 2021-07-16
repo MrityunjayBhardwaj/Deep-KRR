@@ -1,4 +1,5 @@
 *.gv
 *.gv.pdf
+./2layerKRR/__pycache__/*
 __pycache__
-
+TODO

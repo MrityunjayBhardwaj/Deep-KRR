@@ -20,14 +20,16 @@ class SingleLayerKRR(gpy.models.ExactGP):
         
 
 class CompositeKernelRegression(nn.Module):
-    def __init__(self, ranges, inputs, device="cpu"):
+    def __init__(self, ranges, inputs, device="cpu",**kwargs ):
         """
         specify the domain and range of all RKHS + inputs to index the subspaces @ all layers(RKHS).
         """
         super(CompositeKernelRegression, self).__init__()
+
+        poly_degree_K1 = kwargs.get('degree') or 2
         # specify kernels for each layers.
         self.K2 = gpy.kernels.PolynomialKernel(2).to(device)
-        self.K1 = gpy.kernels.PolynomialKernel(2).to(device)
+        self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
 
         self.N  = len(inputs)
 

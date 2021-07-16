@@ -8,17 +8,17 @@ if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
 set shortmess=aoO
-badd +89 2layerKRR/rls2.py
+badd +1 2layerKRR/rls2.py
 badd +1 term://~/Documents/research/concatML//9402:/bin/bash
-badd +16 ~/Documents/research/concatML/2layerKRR/compositeKRR.py
+badd +13 ~/Documents/research/concatML/2layerKRR/compositeKRR.py
+badd +4 .gitignore
+badd +9 TODO
 argglobal
 %argdel
+tabnew
+tabrewind
 edit 2layerKRR/rls2.py
 set splitbelow splitright
-wincmd _ | wincmd |
-vsplit
-1wincmd h
-wincmd w
 wincmd _ | wincmd |
 split
 1wincmd k
@@ -32,16 +32,13 @@ set winminheight=0
 set winheight=1
 set winminwidth=0
 set winwidth=1
-exe 'vert 1resize ' . ((&columns * 30 + 95) / 191)
+exe '1resize ' . ((&lines * 30 + 25) / 50)
+exe 'vert 1resize ' . ((&columns * 94 + 95) / 191)
 exe '2resize ' . ((&lines * 30 + 25) / 50)
-exe 'vert 2resize ' . ((&columns * 79 + 95) / 191)
-exe '3resize ' . ((&lines * 30 + 25) / 50)
-exe 'vert 3resize ' . ((&columns * 80 + 95) / 191)
-exe '4resize ' . ((&lines * 15 + 25) / 50)
-exe 'vert 4resize ' . ((&columns * 160 + 95) / 191)
+exe 'vert 2resize ' . ((&columns * 96 + 95) / 191)
+exe '3resize ' . ((&lines * 15 + 25) / 50)
 argglobal
-enew
-file \[coc-explorer]-1
+balt .gitignore
 setlocal fdm=manual
 setlocal fde=0
 setlocal fmr={{{,}}}
@@ -49,9 +46,21 @@ setlocal fdi=#
 setlocal fdl=0
 setlocal fml=1
 setlocal fdn=20
-setlocal nofen
+setlocal fen
+silent! normal! zE
+let &fdl = &fdl
+let s:l = 269 - ((16 * winheight(0) + 15) / 30)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 269
+normal! 09|
 wincmd w
 argglobal
+if bufexists("2layerKRR/rls2.py") | buffer 2layerKRR/rls2.py | else | edit 2layerKRR/rls2.py | endif
+if &buftype ==# 'terminal'
+  silent file 2layerKRR/rls2.py
+endif
 balt ~/Documents/research/concatML/2layerKRR/compositeKRR.py
 setlocal fdm=manual
 setlocal fde=0
@@ -63,35 +72,17 @@ setlocal fdn=20
 setlocal fen
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 194 - ((18 * winheight(0) + 15) / 30)
+let s:l = 128 - ((21 * winheight(0) + 15) / 30)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 194
-normal! 03|
-wincmd w
-argglobal
-if bufexists("~/Documents/research/concatML/2layerKRR/compositeKRR.py") | buffer ~/Documents/research/concatML/2layerKRR/compositeKRR.py | else | edit ~/Documents/research/concatML/2layerKRR/compositeKRR.py | endif
-if &buftype ==# 'terminal'
-  silent file ~/Documents/research/concatML/2layerKRR/compositeKRR.py
+keepjumps 128
+let s:c = 80 - ((73 * winwidth(0) + 48) / 96)
+if s:c > 0
+  exe 'normal! ' . s:c . '|zs' . 80 . '|'
+else
+  normal! 080|
 endif
-balt 2layerKRR/rls2.py
-setlocal fdm=manual
-setlocal fde=0
-setlocal fmr={{{,}}}
-setlocal fdi=#
-setlocal fdl=0
-setlocal fml=1
-setlocal fdn=20
-setlocal fen
-silent! normal! zE
-let &fdl = &fdl
-let s:l = 16 - ((15 * winheight(0) + 15) / 30)
-if s:l < 1 | let s:l = 1 | endif
-keepjumps exe s:l
-normal! zt
-keepjumps 16
-normal! 034|
 wincmd w
 argglobal
 if bufexists("term://~/Documents/research/concatML//9402:/bin/bash") | buffer term://~/Documents/research/concatML//9402:/bin/bash | else | edit term://~/Documents/research/concatML//9402:/bin/bash | endif
@@ -107,22 +98,104 @@ setlocal fdl=0
 setlocal fml=1
 setlocal fdn=20
 setlocal fen
-let s:l = 249 - ((14 * winheight(0) + 7) / 15)
+let s:l = 15 - ((14 * winheight(0) + 7) / 15)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 249
-normal! 060|
+keepjumps 15
+normal! 0
 wincmd w
-2wincmd w
-exe 'vert 1resize ' . ((&columns * 30 + 95) / 191)
+exe '1resize ' . ((&lines * 30 + 25) / 50)
+exe 'vert 1resize ' . ((&columns * 94 + 95) / 191)
 exe '2resize ' . ((&lines * 30 + 25) / 50)
-exe 'vert 2resize ' . ((&columns * 79 + 95) / 191)
-exe '3resize ' . ((&lines * 30 + 25) / 50)
-exe 'vert 3resize ' . ((&columns * 80 + 95) / 191)
-exe '4resize ' . ((&lines * 15 + 25) / 50)
-exe 'vert 4resize ' . ((&columns * 160 + 95) / 191)
-tabnext 1
+exe 'vert 2resize ' . ((&columns * 96 + 95) / 191)
+exe '3resize ' . ((&lines * 15 + 25) / 50)
+tabnext
+edit ~/Documents/research/concatML/2layerKRR/compositeKRR.py
+set splitbelow splitright
+wincmd _ | wincmd |
+vsplit
+1wincmd h
+wincmd w
+wincmd _ | wincmd |
+split
+1wincmd k
+wincmd w
+wincmd t
+set winminheight=0
+set winheight=1
+set winminwidth=0
+set winwidth=1
+exe 'vert 1resize ' . ((&columns * 30 + 95) / 191)
+exe '2resize ' . ((&lines * 22 + 25) / 50)
+exe 'vert 2resize ' . ((&columns * 160 + 95) / 191)
+exe '3resize ' . ((&lines * 23 + 25) / 50)
+exe 'vert 3resize ' . ((&columns * 160 + 95) / 191)
+argglobal
+enew
+file \[coc-explorer]-1
+balt vimspector.Variables
+setlocal fdm=manual
+setlocal fde=0
+setlocal fmr={{{,}}}
+setlocal fdi=#
+setlocal fdl=0
+setlocal fml=1
+setlocal fdn=20
+setlocal nofen
+wincmd w
+argglobal
+balt vimspector.Variables
+setlocal fdm=manual
+setlocal fde=0
+setlocal fmr={{{,}}}
+setlocal fdi=#
+setlocal fdl=0
+setlocal fml=1
+setlocal fdn=20
+setlocal fen
+silent! normal! zE
+let &fdl = &fdl
+let s:l = 13 - ((5 * winheight(0) + 11) / 22)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 13
+let s:c = 40 - ((7 * winwidth(0) + 80) / 160)
+if s:c > 0
+  exe 'normal! ' . s:c . '|zs' . 40 . '|'
+else
+  normal! 040|
+endif
+wincmd w
+argglobal
+if bufexists("term://~/Documents/research/concatML//9402:/bin/bash") | buffer term://~/Documents/research/concatML//9402:/bin/bash | else | edit term://~/Documents/research/concatML//9402:/bin/bash | endif
+if &buftype ==# 'terminal'
+  silent file term://~/Documents/research/concatML//9402:/bin/bash
+endif
+balt 2layerKRR/rls2.py
+setlocal fdm=manual
+setlocal fde=0
+setlocal fmr={{{,}}}
+setlocal fdi=#
+setlocal fdl=0
+setlocal fml=1
+setlocal fdn=20
+setlocal fen
+let s:l = 1 - ((0 * winheight(0) + 11) / 23)
+if s:l < 1 | let s:l = 1 | endif
+keepjumps exe s:l
+normal! zt
+keepjumps 1
+normal! 0
+wincmd w
+3wincmd w
+exe 'vert 1resize ' . ((&columns * 30 + 95) / 191)
+exe '2resize ' . ((&lines * 22 + 25) / 50)
+exe 'vert 2resize ' . ((&columns * 160 + 95) / 191)
+exe '3resize ' . ((&lines * 23 + 25) / 50)
+exe 'vert 3resize ' . ((&columns * 160 + 95) / 191)
+tabnext 2
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0&& getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
 endif
@@ -133,6 +206,7 @@ if filereadable(s:sx)
   exe "source " . fnameescape(s:sx)
 endif
 let &g:so = s:so_save | let &g:siso = s:siso_save
+nohlsearch
 doautoall SessionLoadPost
 unlet SessionLoad
 " vim: set ft=vim :

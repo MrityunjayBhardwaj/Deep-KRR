@@ -7,15 +7,18 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import gpytorch as gpy
 
-def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100):
+def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg_loss=0, retain_graph=False):
     for epoch in range(num_epochs):
 
       # Backpropagation
       optimizer.zero_grad()
       # Compute prediction and loss
       pred = model(data_x)
+
       loss = loss_fn(pred, data_y)
-      loss.backward()
+      if is_neg_loss:
+          loss = -1*loss
+      loss.backward(retain_graph=retain_graph)
       optimizer.step()
 
       if(loss < 1):
@@ -71,7 +74,7 @@ def createSyntheticData(num_data_points=10):
     domains = [2, 2]
     ranges  = [2, 1]
 
-    return [domains, ranges, x_grid, output_1]
+    return [domains, ranges, x_grid, output_1, output_2]
 def train_4gpy(train_x, train_y, model, likelihood,device, num_epochs ):
 
     training_iter = num_epochs
@@ -95,7 +98,7 @@ def train_4gpy(train_x, train_y, model, likelihood,device, num_epochs ):
         loss = -mll(output, train_y)
         loss.backward()
 
-        if i % 1000:
+        if (i % 1000 == 0):
           print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
               i + 1, training_iter, loss.item(),
               model.covar_module.base_kernel.lengthscale.item(),
@@ -118,8 +121,12 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
 
     loss = gpy.mlls.ExactMarginalLogLikelihood(likelihood, model)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    #train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
-    train_4gpy(data_x, data_y, model, likelihood, device, num_epochs)
+    # Find optimal model hyperparameters
+    model.train()
+    likelihood.train()
+    data_y = data_y.squeeze(1)
+    train_loop(data_x, data_y, model, loss, optimizer, num_epochs, is_neg_loss=1)
+    #train_4gpy(data_x, data_y, model, likelihood, device, num_epochs, is_neg_loss=1)
 
     predY = model(data_x)
     print('predY from SKRR: ', predY)
@@ -138,43 +145,70 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
 
 
     # specify the data.
-    _,ranges,data_x,data_y = createSyntheticData(num_data_points)
+    _,ranges,data_x,data_y_h1, data_y_h2 = createSyntheticData(num_data_points)
 
     data_x = data_x.to(device)
-    data_y = data_y.to(device)
-    model = e2eKRR(data_x, data_y, ranges, device, num_epochs*0 + 1000);
-    model_s = e2eSKRR(data_x, data_y, device, num_epochs*0 + 100);
+    data_y_h1 = data_y_h1.to(device)
+    data_y_h2 = data_y_h2.to(device)
+
+    num_epochs = 1000
+
+    print(data_x.shape, data_y_h1.shape, data_y_h2.shape)
+
+    # calculating the models for constructing h1 and h2 functions.
+    final_layer_poly_kernel_degree = 2
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+    print('works!')
+    model_comp_h2_v1 = e2eKRR(data_x, data_y_h2, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+    print('works_2!')
+
+    final_layer_poly_kernel_degree = 2
+    model_comp_h1_v2 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+    model_comp_h2_v2 = e2eKRR(data_x, data_y_h2, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+
+    model_single_h1 = e2eSKRR(data_x, data_y_h1, device, num_epochs);
+    model_single_h2 = e2eSKRR(data_x, data_y_h2, device, num_epochs);
 
     # Calculate the predictions.
-    pred_y = model(data_x)
-    pred_y_s = model_s(data_x).mean
+    pred_y_comp_h1_v1 = model_comp_h1_v1(data_x)
+    pred_y_comp_h2_v1 = model_comp_h2_v1(data_x)
+    pred_y_comp_h1_v2 = model_comp_h1_v2(data_x)
+    pred_y_comp_h2_v2 = model_comp_h2_v2(data_x)
+
+    pred_y_single_h1 = model_single_h1(data_x).mean
+    pred_y_single_h2 = model_single_h2(data_x).mean
 
     # calculating the loss at each point.
-    loss = torch.abs(pred_y - data_y)
-    loss_s = torch.abs(pred_y_s - data_y.squeeze(1)).unsqueeze(1)
+    loss_comp_h1_v1 = torch.abs(pred_y_comp_h1_v1 - data_y_h1)
+    loss_comp_h2_v1 = torch.abs(pred_y_comp_h2_v1 - data_y_h2)
+    loss_comp_h1_v2 = torch.abs(pred_y_comp_h1_v2 - data_y_h1)
+    loss_comp_h2_v2 = torch.abs(pred_y_comp_h2_v2 - data_y_h2)
+
+    loss_single_h1 = torch.abs(pred_y_single_h1 - data_y_h1.squeeze(1)).unsqueeze(1)
+    loss_single_h2 = torch.abs(pred_y_single_h2 - data_y_h2.squeeze(1)).unsqueeze(1)
 
     # preparing data for visualization.
-    l = loss.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
-    l2 = loss_s.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
-    data_x_grid = data_x.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
+    loss_comp_h1_v1_viz = loss_comp_h1_v1.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+    loss_comp_h2_v1_viz = loss_comp_h2_v1.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+    loss_comp_h1_v2_viz = loss_comp_h1_v2.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+    loss_comp_h2_v2_viz = loss_comp_h2_v2.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
 
+    loss_single_h1_viz = loss_single_h1.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+    loss_single_h2_viz = loss_single_h2.reshape([num_data_points, num_data_points]).cpu().detach().numpy()
+
+    data_x_grid = data_x.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
     dx1 = dx2 = data_x_grid[:, :, 1][:1, :].squeeze().cpu().detach().numpy()
 
-    print(dx1, dx2, l.shape)
+    fig = make_subplots(rows=2, cols=3, subplot_titles=['(p = 1)', '(p = 2)°(p = 1)', ' (p = 2)°(p = 2)'])
+    fig.add_trace(go.Contour(z=loss_single_h1_viz,x=dx1,y=dx2), 1, 1)
+    fig.add_trace(go.Contour(z=loss_single_h2_viz,x=dx1,y=dx2), 2, 1)
 
-    fig = go.Figure(data=go.Contour(z=l,x=dx1,y=dx2))
-
-    fig = make_subplots(rows=1, cols=2, subplot_titles=['', ''])
-    fig.add_trace(go.Contour(z=l2,x=dx1,y=dx2))
-    fig.add_trace(go.Contour(z=l,x=dx1,y=dx2))
-
+    fig.add_trace(go.Contour(z=loss_comp_h1_v1_viz,x=dx1,y=dx2), 1, 2)
+    fig.add_trace(go.Contour(z=loss_comp_h2_v1_viz,x=dx1,y=dx2), 2, 2)
+    fig.add_trace(go.Contour(z=loss_comp_h1_v2_viz,x=dx1,y=dx2), 1, 3)
+    fig.add_trace(go.Contour(z=loss_comp_h2_v2_viz,x=dx1,y=dx2), 2, 3)
 
     fig.show()
-
-    del data_x
-    del data_y
-    del model
-    del dx1
 
 def vizLossLandscape(loss, x, y, z):
     """
@@ -211,7 +245,7 @@ def main2(num_epochs=100):
     return e2eSKRR(data_x,data_y,device,num_epochs)
 
 # main2()
-def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
+def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100):
 
     # hyperparams
     learning_rate = 0.0005
@@ -225,7 +259,7 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
     print('data_x.device: ', data_x.device, device)
 
     # initializing the main training loop components.
-    model = CompositeKernelRegression(ranges, data_x, device) # TODO: specify the args
+    model = CompositeKernelRegression(ranges, data_x, device, degree=degree) # TODO: specify the args
     model = model.to(device)
 
     #predY = model(data_x)
@@ -259,4 +293,3 @@ def e2eKRR( data_x, data_y, ranges, device, num_epochs=100):
 #main(nEpochs)
 
 repr_fig3()
-    
