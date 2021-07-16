@@ -9,8 +9,8 @@ class SingleLayerKRR(gpy.models.ExactGP):
         super(SingleLayerKRR, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpy.means.ConstantMean()
         #self.covar_module = gpy.lazy.ZeroLazyTensor(train_x.size())
-        #self.covar_module  = gpy.kernels.PolynomialKernel(2)
-        self.covar_module = gpy.kernels.ScaleKernel(gpy.kernels.RBFKernel())
+        self.covar_module  = gpy.kernels.PolynomialKernel(2)
+        #self.covar_module = gpy.kernels.ScaleKernel(gpy.kernels.RBFKernel())
 
     def forward(self, X):
         mean_x = self.mean_module(X)
