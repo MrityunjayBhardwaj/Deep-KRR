@@ -14,19 +14,19 @@ class SingleLayerKRR(gpy.models.ExactGP):
 
     def forward(self, X):
         mean_x = self.mean_module(X)
-        #mean_x = mean_x.unsqueeze(1)
         covar_x = self.covar_module(X)
         return gpy.distributions.MultivariateNormal(mean_x, covar_x)
-        
 
 class CompositeKernelRegression(nn.Module):
-    def __init__(self, ranges, inputs, device="cpu",**kwargs ):
+    def __init__(self, ranges, inputs, device="cpu",**kwargs):
         """
         specify the domain and range of all RKHS + inputs to index the subspaces @ all layers(RKHS).
         """
         super(CompositeKernelRegression, self).__init__()
 
         poly_degree_K1 = kwargs.get('degree') or 2
+        retain_layer_outputs = kwargs.get('retain_layer_outputs')
+
         # specify kernels for each layers.
         self.K2 = gpy.kernels.PolynomialKernel(2).to(device)
         self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
@@ -43,10 +43,15 @@ class CompositeKernelRegression(nn.Module):
         self.fn1 = fn_init(self.K1, self.K1_weights, ranges[1], device)
 
         # final composite function.
-        self.h = compose([self.fn1, self.fn2], inputs)
+        self.h = compose([self.fn1, self.fn2], inputs, retain_layer_outputs)
+
+        self.layer_outputs = []
 
     def forward(self, X):
-        return self.h(X)
+        final_output, all_layers_outputs = self.h(X)
+
+        self.layer_outputs = all_layers_outputs
+        return final_output
 
     def parameters(self):
         return [self.K1_weights, self.K2_weights]

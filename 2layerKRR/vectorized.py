@@ -60,25 +60,33 @@ def preprocess(skeleton_fn_arr, inputs):
     fn_arr.append(fn_at_prev_inp)
   return fn_arr
 
-def realize_composite_fns(fn_arr, input, val):
+def realize_composite_fns(fn_arr, input, val, retain_layer_outputs=False):
   prev_val = val
+
+  layer_outputs = []
   # TODO: reverse the order of fn_arr
   for curr_fn in fn_arr:
     
     curr_val = curr_fn(input, prev_val)
     # print(curr_fn, prev_val, curr_val)
     prev_val = curr_val
-    
-  return prev_val
 
-def compose(skel_fn_arr, input):
+    if(retain_layer_outputs):
+        layer_outputs.append(prev_val)
+
+  return prev_val,layer_outputs
+
+def compose(skel_fn_arr, input, retain_layer_outputs):
   """
   given a array of fns this function calculates the composition of these function in mathematically consistent fashion
   i.e, compose([fn1, fn2, fn3], x) == fn1 ° fn2 ° fn3 == fn1(fn2(fn3(x))) respectively.
   """
   skel_fn_arr.reverse() # reversing the order to make it consistent with the mathematical notation.
   fn_arr = skel_fn_arr
+
+  if (retain_layer_outputs):
+      print('retaining layer outputs')
   #fn_arr = preprocess(skel_fn_arr, input) # function in the subspace of rkhs spanned by the repe_eval_at_prev_inputs. NOTE: skeleton of rep eval is present in each skel_fn_arr entry.
   def fn(val):
-    return  realize_composite_fns(fn_arr,input, val)
+    return  realize_composite_fns(fn_arr,input, val, retain_layer_outputs)
   return fn
