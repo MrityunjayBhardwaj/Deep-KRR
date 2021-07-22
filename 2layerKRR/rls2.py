@@ -195,7 +195,7 @@ def repr_fig6(num_data_points=10, num_epochs=100):
     layer_outputs = model_comp_h1_v1.layer_outputs
     #print(layer_outputs)
 
-    l0 = layer_outputs[0]
+    l0 = layer_outputs[0].detach()
     data_y_h1 = data_y_h1.squeeze(1)
     data_y_h2 = data_y_h2.squeeze(1)
 
@@ -205,8 +205,7 @@ def repr_fig6(num_data_points=10, num_epochs=100):
     masked_y_h1 = data_y_h1*mask
 
 
-    l0_grid = l0.detach()
-    l0_grid = l0_grid.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
+    l0_grid = l0.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
 
     print(data_y_h1.shape, data_y_h2.shape, data_y_h2.reshape(10, 10))
 
@@ -246,28 +245,44 @@ def repr_fig6(num_data_points=10, num_epochs=100):
     plt.subplot_tool()
     #plt.show()
 
+    bins = num_data_points
+
     im = Image.fromarray(data_y_h2)
-    dst_grid = griddify(shape_to_rect(im.size), 10, 10)
+    dst_grid = griddify(shape_to_rect(im.size), bins - 1, bins -1)
 
-    catgor = np.digitize(l0_grid, dx1)
+    l0min = l0.min(0).values
+    l0max = l0.max(0).values
 
-    print('min&max: ', torch.min(l0_grid), torch.max(l0_grid))
-    #print("catgor: ", catgor)
+    linspace_x = np.linspace(l0min[0], l0max[0], bins)
+    linspace_y = np.linspace(l0min[1], l0max[1], bins)
+    catgor_x = np.digitize(l0[:, 0], linspace_x)
+    catgor_y = np.digitize(l0[:, 1], linspace_y)
+    catgor_x = np.expand_dims(catgor_x, 1)
+    catgor_y = np.expand_dims(catgor_y, 1)
 
+    print(linspace_x.shape, catgor_x.shape, catgor_y.shape)
+    catgor = np.concatenate([catgor_x, catgor_y], 1)
+    catgor_grid = catgor.reshape([ int(bins**(1)), int(bins**(1)), data_x.shape[1]])
+
+    # converting category to index
+    index_grid = catgor_grid - 1;
+    index_grid = np.abs((index_grid >= 0)*index_grid)
+
+    print('min&max: ', torch.min(l0_grid), torch.max(l0_grid), catgor.shape, np.min(dst_grid), dst_grid.shape, index_grid.shape)
 
     # TODO: Convert category to index and map them to dst_grid.
     # this will give us the grid coordinates of the transformed( transformed by our network layer ) input data grid.
 
-    src_grid = distort_grid(dst_grid, 1)
+    #src_grid = distort_grid(dst_grid, 1)
 
-    mesh = grid_to_mesh(src_grid, dst_grid)
+    mesh = grid_to_mesh(index_grid, dst_grid)
 
     #print('dst_grid: ', dst_grid, 'src_grid: ', src_grid, 'mesh: ', mesh, len(mesh), len(mesh[8]), len(mesh[8][0]))
     im = im.transform(im.size, Image.MESH, mesh)
     #im = im.resize((200,200), Image.LINEAR)
 
     axs[1,1].imshow(np.array(im))
-    #plt.show()
+    plt.show()
 
     #im.show()
 
