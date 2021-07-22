@@ -166,18 +166,21 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
 
     loss = gpy.mlls.ExactMarginalLogLikelihood(likelihood, model)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    decayRate = 0.96
+    optimizer_with_lr_decay = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
     # Find optimal model hyperparameters
     model.train()
     likelihood.train()
     data_y = data_y.squeeze(1)
-    train_loop(data_x, data_y, model, loss, optimizer, num_epochs, is_neg_loss=1)
+    train_loop(data_x, data_y, model, loss, optimizer_with_lr_decay, num_epochs, is_neg_loss=1)
 
     predY = model(data_x)
     print('predY from SKRR: ', predY)
 
     return model
 
-def repr_fig6(num_data_points=10, num_epochs=100):
+def repr_fig6(num_data_points=10, num_epochs=10000):
     # check for cuda
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
@@ -189,8 +192,8 @@ def repr_fig6(num_data_points=10, num_epochs=100):
     data_y_h2 = data_y_h2.to(device)*1.0
 
     # calculating the models for constructing h1 and h2 functions.
-    final_layer_poly_kernel_degree = 1
-    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs, retain_layer_outputs=True);
+    first_layer_poly_kernel_degree = 2
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs, retain_layer_outputs=True);
 
     layer_outputs = model_comp_h1_v1.layer_outputs
     #print(layer_outputs)
@@ -247,7 +250,7 @@ def repr_fig6(num_data_points=10, num_epochs=100):
 
     bins = num_data_points
 
-    im = Image.fromarray(data_y_h2)
+    im = Image.fromarray(data_y_h1)
     dst_grid = griddify(shape_to_rect(im.size), bins - 1, bins -1)
 
     l0min = l0.min(0).values

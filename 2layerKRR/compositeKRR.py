@@ -24,12 +24,13 @@ class CompositeKernelRegression(nn.Module):
         """
         super(CompositeKernelRegression, self).__init__()
 
-        poly_degree_K1 = kwargs.get('degree') or 2
+        poly_degree_K2 = kwargs.get('degree') or 2
         retain_layer_outputs = kwargs.get('retain_layer_outputs')
 
         # specify kernels for each layers.
-        self.K2 = gpy.kernels.PolynomialKernel(2).to(device)
-        self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
+        self.K2 = gpy.kernels.PolynomialKernel(poly_degree_K2).to(device)
+        #self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
+        self.K1 = gpy.kernels.MaternKernel().to(device)
 
         self.N  = len(inputs)
 
