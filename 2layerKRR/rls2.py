@@ -1,3 +1,4 @@
+from numpy.core.numeric import ones
 from compositeKRR import CompositeKernelRegression, SingleLayerKRR
 import math
 import torch
@@ -6,7 +7,78 @@ import torchviz
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import gpytorch as gpy
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.transforms as mtransforms
+from PIL import Image
 
+def quad_as_rect(quad):
+    if quad[0] != quad[2]: return False
+    if quad[1] != quad[7]: return False
+    if quad[4] != quad[6]: return False
+    if quad[3] != quad[5]: return False
+    return True
+
+def quad_to_rect(quad):
+    assert(len(quad) == 8)
+    assert(quad_as_rect(quad))
+    return (quad[0], quad[1], quad[4], quad[3])
+
+def rect_to_quad(rect):
+    assert(len(rect) == 4)
+    return (rect[0], rect[1], rect[0], rect[3], rect[2], rect[3], rect[2], rect[1])
+
+def shape_to_rect(shape):
+    assert(len(shape) == 2)
+    return (0, 0, shape[0], shape[1])
+
+def griddify(rect, w_div, h_div):
+    w = rect[2] - rect[0]
+    h = rect[3] - rect[1]
+    x_step = w / float(w_div)
+    y_step = h / float(h_div)
+    y = rect[1]
+    grid_vertex_matrix = []
+    for _ in range(h_div + 1):
+        grid_vertex_matrix.append([])
+        x = rect[0]
+        for _ in range(w_div + 1):
+            grid_vertex_matrix[-1].append([int(x), int(y)])
+            x += x_step
+        y += y_step
+    grid = np.array(grid_vertex_matrix)
+    return grid
+
+def distort_grid(org_grid, max_shift):
+    new_grid = np.copy(org_grid)
+    x_min = np.min(new_grid[:, :, 0])
+    y_min = np.min(new_grid[:, :, 1])
+    x_max = np.max(new_grid[:, :, 0])
+    y_max = np.max(new_grid[:, :, 1])
+    new_grid += np.random.randint(- max_shift, max_shift + 1, new_grid.shape)
+    new_grid[:, :, 0] = np.maximum(x_min, new_grid[:, :, 0])
+    new_grid[:, :, 1] = np.maximum(y_min, new_grid[:, :, 1])
+    new_grid[:, :, 0] = np.minimum(x_max, new_grid[:, :, 0])
+    new_grid[:, :, 1] = np.minimum(y_max, new_grid[:, :, 1])
+    return new_grid
+
+def grid_to_mesh(src_grid, dst_grid):
+    assert(src_grid.shape == dst_grid.shape)
+    mesh = []
+    for i in range(src_grid.shape[0] - 1):
+        for j in range(src_grid.shape[1] - 1):
+            src_quad = [src_grid[i    , j    , 0], src_grid[i    , j    , 1],
+                        src_grid[i + 1, j    , 0], src_grid[i + 1, j    , 1],
+                        src_grid[i + 1, j + 1, 0], src_grid[i + 1, j + 1, 1],
+                        src_grid[i    , j + 1, 0], src_grid[i    , j + 1, 1]]
+
+            dst_quad = [dst_grid[i    , j    , 0], dst_grid[i    , j    , 1],
+                        dst_grid[i + 1, j    , 0], dst_grid[i + 1, j    , 1],
+                        dst_grid[i + 1, j + 1, 0], dst_grid[i + 1, j + 1, 1],
+                        dst_grid[i    , j + 1, 0], dst_grid[i    , j + 1, 1]]
+            dst_rect = quad_to_rect(dst_quad)
+            mesh.append([dst_rect, src_quad])
+    return mesh
 def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg_loss=0):
     threshold = 1
     for epoch in range(num_epochs):
@@ -105,6 +177,111 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
 
     return model
 
+def repr_fig6(num_data_points=10, num_epochs=100):
+    # check for cuda
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cpu'
+    print('Using {} device'.format(device))
+
+    _,ranges,data_x,data_y_h1, data_y_h2 = createSyntheticData(num_data_points)
+    data_x = data_x.to(device)
+    data_y_h1 = data_y_h1.to(device)
+    data_y_h2 = data_y_h2.to(device)*1.0
+
+    # calculating the models for constructing h1 and h2 functions.
+    final_layer_poly_kernel_degree = 1
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs, retain_layer_outputs=True);
+
+    layer_outputs = model_comp_h1_v1.layer_outputs
+    #print(layer_outputs)
+
+    l0 = layer_outputs[0]
+    data_y_h1 = data_y_h1.squeeze(1)
+    data_y_h2 = data_y_h2.squeeze(1)
+
+    #data_y_h1 = data_y_h1.reshape([10, 10])
+    mask = torch.abs(data_x - l0).less(1)
+    mask = mask.sum(1).bool()
+    masked_y_h1 = data_y_h1*mask
+
+
+    l0_grid = l0.detach()
+    l0_grid = l0_grid.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
+
+    print(data_y_h1.shape, data_y_h2.shape, data_y_h2.reshape(10, 10))
+
+    data_x_grid = data_x.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
+    dx1 = dx2 = data_x_grid[:, :, 1][:1, :].squeeze().cpu().detach().numpy()
+    data_y_h1 = data_y_h1.reshape(data_x_grid.shape[:2])
+    data_y_h1 = data_y_h1.cpu().detach().numpy() 
+    data_y_h2 = data_y_h2.reshape(data_x_grid.shape[:2])
+    data_y_h2 = data_y_h2.cpu().detach().numpy() 
+    masked_y_h1 = masked_y_h1.reshape(data_x_grid.shape[:2])
+    masked_y_h1 = masked_y_h1.cpu().detach().numpy() 
+
+
+    print("dx1: ", dx1,"dx2: ", dx2,"data_y_h2: ", data_y_h2, 'masked_y1: ', masked_y_h1, 'l0: ', l0, l0_grid)
+    #data_y_h2 = torch.ones_like(data_y_h2)
+
+    fig, axs = plt.subplots(2,2)
+
+    img = data_y_h1.copy()
+    A = img.shape[0] / 3.0
+    w = 2.0 / img.shape[1]
+
+
+    shift = lambda x: A * np.sin(2.0*np.pi*x * w)
+
+    print(img[:,0], img.shape)
+
+    for i in range(img.shape[0]):
+        img[:,i] = np.roll(img[:,i], int(shift(i)))
+
+    axs[0,0].imshow(data_y_h1)
+    axs[0,1].imshow(data_y_h2)
+    axs[1,0].imshow(masked_y_h1)
+    axs[1,1].imshow(img)
+
+
+    plt.subplot_tool()
+    #plt.show()
+
+    im = Image.fromarray(data_y_h2)
+    dst_grid = griddify(shape_to_rect(im.size), 10, 10)
+
+    catgor = np.digitize(l0_grid, dx1)
+
+    print('min&max: ', torch.min(l0_grid), torch.max(l0_grid))
+    #print("catgor: ", catgor)
+
+
+    # TODO: Convert category to index and map them to dst_grid.
+    # this will give us the grid coordinates of the transformed( transformed by our network layer ) input data grid.
+
+    src_grid = distort_grid(dst_grid, 1)
+
+    mesh = grid_to_mesh(src_grid, dst_grid)
+
+    #print('dst_grid: ', dst_grid, 'src_grid: ', src_grid, 'mesh: ', mesh, len(mesh), len(mesh[8]), len(mesh[8][0]))
+    im = im.transform(im.size, Image.MESH, mesh)
+    #im = im.resize((200,200), Image.LINEAR)
+
+    axs[1,1].imshow(np.array(im))
+    #plt.show()
+
+    #im.show()
+
+
+
+    
+
+    #print(l0.shape, data_x.shape, masked_y1, data_y_h1.shape, mask.sum(), dx1.shape)
+    #fig = make_subplots(rows=1, cols=3, subplot_titles=['(p = 1)', '(p = 2)°(p = 1)', ' (p = 2)°(p = 2)'])
+    #fig.add_trace(go.Contour(z=data_y_h1,x=dx1,y=dx2), 1, 1)
+    #fig.add_trace(go.Contour(z=data_y_h2,x=dx1,y=dx2), 1, 2)
+    #fig.add_trace(go.Contour(z=masked_y_h1,x=dx1,y=dx2), 1, 3)
+    #fig.show()
+
 def repr_fig3(num_data_points=5,num_epochs=10000):
     """
     Reproducing the result shown in figure3
@@ -126,6 +303,7 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
     # num_epochs = 1000
 
     print(data_x.shape, data_y_h1.shape, data_y_h2.shape)
+
 
     # calculating the models for constructing h1 and h2 functions.
     final_layer_poly_kernel_degree = 1
@@ -215,7 +393,7 @@ def main2(num_epochs=100):
     return e2eSKRR(data_x,data_y,device,num_epochs)
 
 # main2()
-def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100):
+def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, retain_layer_outputs=False):
 
     # hyperparams
     learning_rate = 0.0005
@@ -229,7 +407,7 @@ def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100):
     print('data_x.device: ', data_x.device, device)
 
     # initializing the main training loop components.
-    model = CompositeKernelRegression(ranges, data_x, device, degree=degree) # TODO: specify the args
+    model = CompositeKernelRegression(ranges, data_x, device, degree=degree, retain_layer_outputs=retain_layer_outputs) # TODO: specify the args
     model = model.to(device)
 
     predY = model(data_x)
@@ -262,4 +440,5 @@ def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100):
 #repr_fig3()
 #main(nEpochs)
 
-repr_fig3()
+#repr_fig3()
+repr_fig6()
