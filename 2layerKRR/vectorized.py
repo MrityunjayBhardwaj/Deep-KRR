@@ -81,7 +81,6 @@ def compose(skel_fn_arr, input, retain_layer_outputs):
   given a array of fns this function calculates the composition of these function in mathematically consistent fashion
   i.e, compose([fn1, fn2, fn3], x) == fn1 ° fn2 ° fn3 == fn1(fn2(fn3(x))) respectively.
   """
-  skel_fn_arr.reverse() # reversing the order to make it consistent with the mathematical notation.
   fn_arr = skel_fn_arr
 
   if (retain_layer_outputs):
