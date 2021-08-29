@@ -1,5 +1,5 @@
 from numpy.core.numeric import ones
-from compositeKRR import CompositeKernelRegression, SingleLayerKRR
+from compositeKRR import CompositeKernelRegression, SingleLayerKRR, RLS2, DeepKernelRegression
 import math
 import torch
 import torch.nn as nn
@@ -79,8 +79,12 @@ def grid_to_mesh(src_grid, dst_grid):
             dst_rect = quad_to_rect(dst_quad)
             mesh.append([dst_rect, src_quad])
     return mesh
-def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg_loss=0):
+
+def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg_loss=0, scheduler=None):
     threshold = 1
+
+    print('training_epochs: ', num_epochs)
+    prev_loss = 0;
     for epoch in range(num_epochs):
 
       # Backpropagation
@@ -93,8 +97,16 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg
           loss = -1*loss
       is_last_epoch = (num_epochs - 1 ) == epoch or (loss < threshold)
 
+      if torch.abs(prev_loss - loss) < 0.0001:
+          print('converged!')
+          break
+      prev_loss = loss
+
       loss.backward()
       optimizer.step()
+
+      if scheduler:
+          scheduler.step()
 
 
       if epoch % (1000 + 0*num_epochs) == 0:
@@ -168,12 +180,12 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     decayRate = 0.96
-    optimizer_with_lr_decay = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=decayRate)
     # Find optimal model hyperparameters
     model.train()
     likelihood.train()
     data_y = data_y.squeeze(1)
-    train_loop(data_x, data_y, model, loss, optimizer_with_lr_decay, num_epochs, is_neg_loss=1)
+    train_loop(data_x, data_y, model, loss, optimizer,num_epochs, is_neg_loss=1,  scheduler=lr_scheduler )
 
     predY = model(data_x)
     print('predY from SKRR: ', predY)
@@ -287,22 +299,11 @@ def repr_fig6(num_data_points=10, num_epochs=10000):
     axs[1,1].imshow(np.array(im))
     plt.show()
 
-    #im.show()
-
-
-
-    
-
-    #print(l0.shape, data_x.shape, masked_y1, data_y_h1.shape, mask.sum(), dx1.shape)
-    #fig = make_subplots(rows=1, cols=3, subplot_titles=['(p = 1)', '(p = 2)°(p = 1)', ' (p = 2)°(p = 2)'])
-    #fig.add_trace(go.Contour(z=data_y_h1,x=dx1,y=dx2), 1, 1)
-    #fig.add_trace(go.Contour(z=data_y_h2,x=dx1,y=dx2), 1, 2)
-    #fig.add_trace(go.Contour(z=masked_y_h1,x=dx1,y=dx2), 1, 3)
-    #fig.show()
-
-def repr_fig3(num_data_points=5,num_epochs=10000):
+def repr_fig3(num_data_points=5,num_epochs=10000, viz_prediction_only=False):
     """
     Reproducing the result shown in figure3
+
+    Visualizing the loss or only predictions from 2 deep kernel architectures.
     """
 
     # check for cuda
@@ -324,13 +325,13 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
 
 
     # calculating the models for constructing h1 and h2 functions.
-    final_layer_poly_kernel_degree = 1
-    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs);
-    model_comp_h2_v1 = e2eKRR(data_x, data_y_h2*1.0, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+    first_layer_poly_kernel_degree = 1
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs);
+    model_comp_h2_v1 = e2eKRR(data_x, data_y_h2*1.0, ranges, first_layer_poly_kernel_degree, device, num_epochs);
 
-    final_layer_poly_kernel_degree = 2
-    model_comp_h1_v2 = e2eKRR(data_x, data_y_h1, ranges, final_layer_poly_kernel_degree, device, num_epochs);
-    model_comp_h2_v2 = e2eKRR(data_x, data_y_h2, ranges, final_layer_poly_kernel_degree, device, num_epochs);
+    first_layer_poly_kernel_degree = 2
+    model_comp_h1_v2 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs);
+    model_comp_h2_v2 = e2eKRR(data_x, data_y_h2, ranges, first_layer_poly_kernel_degree, device, num_epochs);
 
     model_single_h1 = e2eSKRR(data_x, data_y_h1, device, num_epochs);
     model_single_h2 = e2eSKRR(data_x, data_y_h2, device, num_epochs);
@@ -345,10 +346,10 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
     pred_y_single_h2 = model_single_h2(data_x).mean
 
     # calculating the loss at each point.
-    loss_comp_h1_v1 = torch.abs(pred_y_comp_h1_v1 - data_y_h1)
-    loss_comp_h2_v1 = torch.abs(pred_y_comp_h2_v1 - data_y_h2)
-    loss_comp_h1_v2 = torch.abs(pred_y_comp_h1_v2 - data_y_h1)
-    loss_comp_h2_v2 = torch.abs(pred_y_comp_h2_v2 - data_y_h2)
+    loss_comp_h1_v1 = torch.abs(pred_y_comp_h1_v1 - data_y_h1*viz_prediction_only)
+    loss_comp_h2_v1 = torch.abs(pred_y_comp_h2_v1 - data_y_h2*viz_prediction_only)
+    loss_comp_h1_v2 = torch.abs(pred_y_comp_h1_v2 - data_y_h1*viz_prediction_only)
+    loss_comp_h2_v2 = torch.abs(pred_y_comp_h2_v2 - data_y_h2*viz_prediction_only)
 
     loss_single_h1 = torch.abs(pred_y_single_h1 - data_y_h1.squeeze(1)).unsqueeze(1)
     loss_single_h2 = torch.abs(pred_y_single_h2 - data_y_h2.squeeze(1)).unsqueeze(1)
@@ -365,7 +366,7 @@ def repr_fig3(num_data_points=5,num_epochs=10000):
     data_x_grid = data_x.reshape([ int(data_x.shape[0]**(1/2)), int(data_x.shape[0]**(1/2)), data_x.shape[1]])
     dx1 = dx2 = data_x_grid[:, :, 1][:1, :].squeeze().cpu().detach().numpy()
 
-    fig = make_subplots(rows=2, cols=3, subplot_titles=['(p = 1)', '(p = 2)°(p = 1)', ' (p = 2)°(p = 2)'])
+    fig = make_subplots(rows=2, cols=3,row_titles=['Function A', 'Function B'], subplot_titles=['original fn', '(p = 1)°Matern', ' (p = 2)°Matern'])
     fig.add_trace(go.Contour(z=loss_single_h1_viz,x=dx1,y=dx2), 1, 1)
     fig.add_trace(go.Contour(z=loss_single_h2_viz,x=dx1,y=dx2), 2, 1)
 
@@ -425,7 +426,8 @@ def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, retain_layer
     print('data_x.device: ', data_x.device, device)
 
     # initializing the main training loop components.
-    model = CompositeKernelRegression(ranges, data_x, device, degree=degree, retain_layer_outputs=retain_layer_outputs) # TODO: specify the args
+    #model = CompositeKernelRegression(ranges, data_x, device, degree=degree, retain_layer_outputs=retain_layer_outputs) # TODO: specify the args
+    model = RLS2(ranges, data_x, device, degree=degree, retain_layer_outputs=retain_layer_outputs) # TODO: specify the args
     model = model.to(device)
 
     predY = model(data_x)
@@ -458,5 +460,10 @@ def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, retain_layer
 #repr_fig3()
 #main(nEpochs)
 
+# visualizng loss
 #repr_fig3()
-repr_fig6()
+
+# visualizng prediction
+repr_fig3(viz_prediction_only=True)
+
+#repr_fig6()
