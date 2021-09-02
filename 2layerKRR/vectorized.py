@@ -34,32 +34,6 @@ def fn_init(Kernel, Ker_weights, range, device):
         return rkhs_fn(inputs, val, Kernel, Ker_weights, range, device)
     return fn_with_specified_args
 
-def lazy_fn(fn, inputs):
-  """
-  this fn initialize the inputs args of given fn.
-  """
-  def fn_at_inputs(val):
-    return fn(inputs, val)
-  return fn_at_inputs
-
-def calc_realization_at_inputs(fn, inputs):
-  fn_at_all_inputs = fn(inputs)
-  return fn_at_all_inputs
-
-def preprocess(skeleton_fn_arr, inputs):
-  fn_arr = []
-  prev_inp = inputs
-
-  for fn in skeleton_fn_arr:
-    fn_at_prev_inp = lazy_fn(fn, prev_inp) # calculate the function indexed at all prev_inps.
-
-    # calculate the 'realization' at all prev_inps.
-    prev_inp = calc_realization_at_inputs(fn_at_prev_inp, prev_inp)
-
-    # append the result
-    fn_arr.append(fn_at_prev_inp)
-  return fn_arr
-
 def realize_composite_fns(fn_arr, input, val, retain_layer_outputs=False):
   prev_val = val
 
@@ -83,8 +57,6 @@ def compose(skel_fn_arr, input, retain_layer_outputs):
   """
   fn_arr = skel_fn_arr
 
-  if (retain_layer_outputs):
-      print('retaining layer outputs')
   #fn_arr = preprocess(skel_fn_arr, input) # function in the subspace of rkhs spanned by the repe_eval_at_prev_inputs. NOTE: skeleton of rep eval is present in each skel_fn_arr entry.
   def fn(val):
     return  realize_composite_fns(fn_arr,input, val, retain_layer_outputs)
