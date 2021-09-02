@@ -30,6 +30,11 @@ class CompositeKernelRegression(nn.Module):
         #self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
         self.K1 = gpy.kernels.MaternKernel().to(device)
 
+        self._K_ranges = ranges
+        self._inputs = inputs
+        self._retain_layer_outputs = retain_layer_outputs
+        self._device = device
+
         self.N  = len(inputs)
 
         # specify the weights for each layers.
@@ -38,16 +43,15 @@ class CompositeKernelRegression(nn.Module):
 
         print('kernel', self.K2, self.K1, ranges)
 
-        # specify the function at each kernel layer.
-        self.fn1 = fn_init(self.K1, self.K1_weights, ranges[1], device)
-        self.fn2 = fn_init(self.K2, self.K2_weights, ranges[0], device)
-
-        # final composite function.
-        self.h = compose([self.fn2, self.fn1], inputs, retain_layer_outputs)
-
         self.layer_outputs = []
 
     def forward(self, X):
+        # specify the function at each kernel layer.
+        self.fn1 = fn_init(self.K1, self.K1_weights, self._K_ranges[1], self._device)
+        self.fn2 = fn_init(self.K2, self.K2_weights, self._K_ranges[0], self._device)
+
+        # final composite function.
+        self.h = compose([self.fn2, self.fn1], self._inputs, self._retain_layer_outputs)
         final_output, all_layers_outputs = self.h(X)
 
         self.layer_outputs = all_layers_outputs
@@ -55,6 +59,12 @@ class CompositeKernelRegression(nn.Module):
 
     def parameters(self):
         return [self.K1_weights, self.K2_weights]
+
+    def load_params(self, new_weights):
+        # todo: check if the shapes are identical.
+        self.K1_weights = new_weights[0]
+        self.K2_weights = new_weights[1]
+
 
 
 class DeepKernelRegression(nn.Module):
@@ -73,21 +83,29 @@ class DeepKernelRegression(nn.Module):
         self.N  = len(inputs)
         self.Fns = []
 
+        # private variables
+        self._ranges = ranges
+        self._device = device
+        self._inputs = inputs
+        self._retain_layer_outputs = retain_layer_outputs
+
         for i, kernel in enumerate(self.Kernels):
             print(i, 'kernel', kernel, ranges[i])
             self.Kernels[i] = kernel.to(device)
             # specify weights for each layers
             curr_Ker_weights =  torch.randn([self.N, 1, ranges[i]], requires_grad=True, device=device)
             self.Weights.append(curr_Ker_weights)
-            # specify the function at each kernel layer.
-            curr_Ker_Fn =  fn_init(self.Kernels[i], self.Weights[i], ranges[i], device)
-            self.Fns.append(curr_Ker_Fn)
-
-        self.compositeFn = compose(self.Fns, inputs, retain_layer_outputs)
 
         self.layer_outputs = []
 
     def forward(self, X):
+        self.Fns = []
+        for i, kernel in enumerate(self.Kernels):
+            # specify the function at each kernel layer.
+            curr_Ker_Fn =  fn_init(self.Kernels[i], self.Weights[i], self._ranges[i], self._device)
+            self.Fns.append(curr_Ker_Fn)
+            pass
+        self.compositeFn = compose(self.Fns, self._inputs, self._retain_layer_outputs)
         final_output, all_layers_outputs = self.compositeFn(X)
 
         self.layer_outputs = all_layers_outputs
@@ -95,6 +113,9 @@ class DeepKernelRegression(nn.Module):
 
     def parameters(self):
         return self.Weights
+
+    def load_params(self, new_weights):
+        self.Weights = new_weights
 
 class RLS2(DeepKernelRegression):
     def __init__(self, ranges, inputs, device="cpu", **kwargs):
