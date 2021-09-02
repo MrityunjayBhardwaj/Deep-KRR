@@ -129,13 +129,20 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg
       pred = model(data_x)
       loss = loss_fn(pred, data_y)
 
+        #       [[-1.0109e+00]],
+
+        # [[ 8.4095e-02]],
+
+        # [[ 1.2025e+00]]], requires_grad=True)
+
       if is_neg_loss:
           loss = -1*loss
       is_last_epoch = (num_epochs - 1 ) == epoch or (loss < threshold)
 
       if torch.abs(prev_loss - loss) < 0.00000001:
+          pass
           print('converged!')
-          break
+          #break
       prev_loss = loss
 
       loss.backward()
@@ -229,7 +236,7 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
 
     return model
 
-def repr_fig6_plotly(num_data_points=10, num_epochs=20000):
+def repr_fig6_plotly(num_data_points=10, num_epochs=2000):
     # check for cuda
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = 'cpu'
@@ -243,14 +250,11 @@ def repr_fig6_plotly(num_data_points=10, num_epochs=20000):
 
     # calculating the models for constructing h1 and h2 functions.
     first_layer_poly_kernel_degree = 2
-    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs, retain_layer_outputs=True);
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs, model_path='model_ckpt.pth', load_model=True, retain_layer_outputs=True);
     layer_outputs = model_comp_h1_v1.layer_outputs
 
     l0_out = layer_outputs[0].detach() # layer 0 outputs
     l0_out = l0_out.cpu().detach().numpy()
-
-    pts = np.loadtxt(np.DataSource().open('https://raw.githubusercontent.com/plotly/datasets/master/mesh_dataset.txt'))
-    x, y, z = pts.T
 
     x = data_x[:, 0].cpu().detach().numpy()
     y = data_x[:, 1].cpu().detach().numpy()
@@ -362,7 +366,6 @@ def repr_fig6_exp(num_data_points=10, num_epochs=10000):
     print('data_x_new', data_x, np.min(l0_out), np.max(l0_out))
 
     # gives the effect of zoom and pan.
-    #dist_img.artifacts['distort:viewport'] = '500x500-'+str(np.min(l0_out))+'-'+str(np.max(l0_out))
     dist_img.artifacts['distort:viewport'] = '500x500-250-250'
 
     # prepare the args and distorting.
@@ -597,7 +600,7 @@ def main2(num_epochs=100):
     return e2eSKRR(data_x,data_y,device,num_epochs)
 
 # main2()
-def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, retain_layer_outputs=False):
+def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, model_path=None, load_model=False,save_model=False, retain_layer_outputs=False):
 
     # hyperparams
     learning_rate = 0.0005
@@ -632,15 +635,32 @@ def e2eKRR( data_x, data_y, ranges, degree, device, num_epochs=100, retain_layer
     loss = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
+    #model.load_state_dict(torch.load('model_weights.pth'))
+    #model.eval()
+    if load_model:
+        checkpoint = torch.load(model_path)
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        num_epochs = checkpoint['epoch']
+        loss = checkpoint['loss']
+        params = checkpoint['params']
+        model.load_params(params)
+        print('model sucessfully loaded! from '+model_path)
+
     train_loop(data_x, data_y, model, loss, optimizer, num_epochs,is_neg_loss=0)
 
-    #predY = model(data_x)
+    if save_model:
+        torch.save({
+                'epoch': num_epochs,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss,
+                'params' : model.parameters(),
+                }, model_path)
+        print('model saved! @ '+model_path)
 
-    #print(predY, data_y)
+    #torch.save(model.state_dict(), 'model_weights.pth')
+    #torch.save(model, 'model.pth')
 
-    #del data_x
-    #del data_y
-    #del model
     torch.cuda.empty_cache()
     return model
 
