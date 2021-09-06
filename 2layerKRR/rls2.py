@@ -239,7 +239,7 @@ def e2eSKRR(data_x, data_y, device, num_epochs=100):
 def repr_fig6_plotly(num_data_points=10, num_epochs=2000):
     # check for cuda
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    device = 'cpu'
+    #device = 'cpu'
     print('Using {} device'.format(device))
 
     _,ranges,data_x,data_y_h1, data_y_h2 = createSyntheticData(num_data_points)
@@ -250,7 +250,7 @@ def repr_fig6_plotly(num_data_points=10, num_epochs=2000):
 
     # calculating the models for constructing h1 and h2 functions.
     first_layer_poly_kernel_degree = 2
-    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs, model_path='model_ckpt.pth', load_model=True, retain_layer_outputs=True);
+    model_comp_h1_v1 = e2eKRR(data_x, data_y_h1, ranges, first_layer_poly_kernel_degree, device, num_epochs, model_path='model_ckpt.pth', save_model=True, retain_layer_outputs=True);
     layer_outputs = model_comp_h1_v1.layer_outputs
 
     l0_out = layer_outputs[0].detach() # layer 0 outputs
@@ -306,7 +306,7 @@ def repr_fig6_plotly(num_data_points=10, num_epochs=2000):
 def repr_fig6_exp(num_data_points=10, num_epochs=10000):
     # check for cuda
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    device = 'cpu'
+    #device = 'cpu'
     print('Using {} device'.format(device))
 
     _,ranges,data_x,data_y_h1, data_y_h2 = createSyntheticData(num_data_points)
