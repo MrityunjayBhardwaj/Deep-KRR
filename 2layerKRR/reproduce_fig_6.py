@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from wand.image import Image, Color
 from itertools import chain
-from rls2 import e2eKRR, createSyntheticData, remap, griddify, shape_to_rect, grid_to_mesh
+from utils import e2eKRR, createSyntheticData, remap, griddify, shape_to_rect, grid_to_mesh
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt

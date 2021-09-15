@@ -1,5 +1,5 @@
 import torch
-from rls2 import e2eKRR, e2eSKRR, createSyntheticData
+from utils import e2eKRR, e2eSKRR, createSyntheticData
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
