@@ -6,6 +6,8 @@ Library and Plots based on the paper ![A representer theorem for Deep Kernel Lea
 
 NOTE: it is recommended to use a seperate virtual environment
 
+Make sure that you are inside the root directory of this repo
+
 Step 1: install imagemagick
 
 ```Shell
@@ -21,15 +23,18 @@ Step 2: install python dependencies
 ## Getting Started
 
 Lets perform Deep Kernel ridge regression on synthetic data similar to the paper.
+
 ```python
 
-from src.compositeKRR import DeepKernelRegression as dkr
-from src.utils import createSyntheticData, train_loop
+from compositeKRR import DeepKernelRegression as dkr
+from utils import createSyntheticData, train_loop
 import gpytorch as gpy
+import torch.nn as nn
+import torch
 
 # specify the data.
 num_data_points = 10
-_,r,data_x,data_y_h1, data_y_h2 = createSyntheticData(num_data_points)
+_,r,data_x,data_y, data_y_h2 = createSyntheticData(num_data_points)
 
 
 # create deep kernel model with 2 layers
@@ -41,10 +46,12 @@ ranges = [2, 1] # output dim of each kernel layer.
 model = dkr(ranges, data_x, kernels, device="cpu")
 
 # training our model
-num_epochs = 100
+num_epochs = 5000
+learning_rate=0.0001
 loss = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 train_loop(data_x, data_y, model, loss, optimizer, num_epochs)
+
 ```
 
 
