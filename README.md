@@ -1,4 +1,4 @@
-# Deep Kernel Ridge Regression
+# Deep Kernel Ridge Regression [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1kBMI1kXE2MNYYsn3zA9kInkhRkWi_MJB?usp=sharing)
 
 Library and Plots based on the paper ![A representer theorem for Deep Kernel Learning](https://jmlr.org/papers/volume20/17-621/17-621.pdf) by B. Bohn et al.
 
