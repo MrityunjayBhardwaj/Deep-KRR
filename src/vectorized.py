@@ -9,14 +9,12 @@ def polyKernel(d):
         return torch.matmul(x1, x2.T).pow(d)
     return _fn
 
-# TODO: vectorize the Kernel
-# TODO: vectorize the fn
 def ker(x1, x2, ker, rkhs_range, device):
     k = ker(x1, x2)
-    k = k.evaluate() # if using gpytorch
+    k = k.evaluate()
     k = k.unsqueeze(2) 
-    k = k.expand(*k.shape[:2], rkhs_range) # 100, 70, 2
-    k = k.unsqueeze(2) # 100, 70, 1,2
+    k = k.expand(*k.shape[:2], rkhs_range)
+    k = k.unsqueeze(2) 
     ey = torch.eye(rkhs_range).unsqueeze(2).expand(rkhs_range,rkhs_range, k.shape[0]).T
     ey = torch.eye(rkhs_range).reshape(1,1, rkhs_range, rkhs_range).expand(*k.shape[: 2], rkhs_range, rkhs_range).to(device)
     return k.mul(ey)
@@ -41,7 +39,7 @@ def realize_composite_fns(fn_arr, input, val, retain_layer_outputs=False):
   # TODO: reverse the order of fn_arr
   for curr_fn in fn_arr:
     
-    curr_val = curr_fn(input, prev_val)
+    curr_val = curr_fn(prev_val, prev_val)
     # print(curr_fn, prev_val, curr_val)
     prev_val = curr_val
 
