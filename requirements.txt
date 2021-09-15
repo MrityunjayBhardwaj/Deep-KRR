@@ -8,3 +8,5 @@ scipy==1.7.0
 tenacity==8.0.1
 torch==1.9.0
 torchviz==0.0.2
+Wand==0.6.7
+torchviz==0.0.2
