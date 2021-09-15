@@ -1,5 +1,5 @@
 from numpy.core.numeric import ones
-from compositeKRR import CompositeKernelRegression, SingleLayerKRR, RLS2, DeepKernelRegression
+from compositeKRR import CompositeKernelRegression, SingleLayerKRR, DeepKernelRegression
 import math
 import torch
 import torch.nn as nn
