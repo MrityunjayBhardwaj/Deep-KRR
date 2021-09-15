@@ -15,58 +15,6 @@ class SingleLayerKRR(gpy.models.ExactGP):
         covar_x = self.covar_module(X)
         return gpy.distributions.MultivariateNormal(mean_x, covar_x)
 
-class CompositeKernelRegression(nn.Module):
-    def __init__(self, ranges, inputs, device="cpu",**kwargs):
-        """
-        specify the domain and range of all RKHS + inputs to index the subspaces @ first RKHS
-        """
-        super(CompositeKernelRegression, self).__init__()
-
-        poly_degree_K2 = kwargs.get('degree') or 2
-        retain_layer_outputs = kwargs.get('retain_layer_outputs')
-
-        # specify kernels for each layers.
-        self.K2 = gpy.kernels.PolynomialKernel(poly_degree_K2).to(device)
-        #self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
-        self.K1 = gpy.kernels.MaternKernel().to(device)
-
-        self._K_ranges = ranges
-        self._inputs = inputs
-        self._retain_layer_outputs = retain_layer_outputs
-        self._device = device
-
-        self.N  = len(inputs)
-
-        # specify the weights for each layers.
-        self.K1_weights = torch.randn([self.N, 1, ranges[1]], requires_grad=True, device=device)
-        self.K2_weights = torch.randn([self.N, 1, ranges[0]], requires_grad=True, device=device)
-
-        print('kernel', self.K2, self.K1, ranges)
-
-        self.layer_outputs = []
-
-    def forward(self, X):
-        # specify the function at each kernel layer.
-        self.fn1 = fn_init(self.K1, self.K1_weights, self._K_ranges[1], self._device)
-        self.fn2 = fn_init(self.K2, self.K2_weights, self._K_ranges[0], self._device)
-
-        # final composite function.
-        self.h = compose([self.fn2, self.fn1], self._inputs, self._retain_layer_outputs)
-        final_output, all_layers_outputs = self.h(X)
-
-        self.layer_outputs = all_layers_outputs
-        return final_output
-
-    def parameters(self):
-        return [self.K1_weights, self.K2_weights]
-
-    def load_params(self, new_weights):
-        # todo: check if the shapes are identical.
-        self.K1_weights = new_weights[0]
-        self.K2_weights = new_weights[1]
-
-
-
 class DeepKernelRegression(nn.Module):
     def __init__(self, ranges, inputs, kernels, device="cpu",**kwargs):
         """
@@ -117,18 +65,3 @@ class DeepKernelRegression(nn.Module):
     def load_params(self, new_weights):
         self.Weights = new_weights
 
-class RLS2(DeepKernelRegression):
-    def __init__(self, ranges, inputs, device="cpu", **kwargs):
-        """
-        2 layer composite Kernels to reproduce the results in _ et al. (2018)
-        """
-
-        poly_degree_K2 = kwargs.get('degree') or 2
-        retain_layer_outputs = kwargs.get('retain_layer_outputs') or None
-
-        # specify kernels for each layers.
-        K2 = gpy.kernels.PolynomialKernel(poly_degree_K2).to(device)
-        #self.K1 = gpy.kernels.PolynomialKernel(poly_degree_K1).to(device)
-        K1 = gpy.kernels.MaternKernel().to(device)
-        kernels = [K2, K1]
-        super().__init__(ranges, inputs, kernels, device=device, retain_layer_outputs=retain_layer_outputs)
