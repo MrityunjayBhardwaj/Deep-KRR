@@ -115,10 +115,10 @@ def grid_to_mesh(src_grid, dst_grid):
     return mesh
 
 def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg_loss=0, scheduler=None):
-    threshold = 1
 
     print('training_epochs: ', num_epochs)
     prev_loss = 0
+    loss = 0
     for epoch in range(num_epochs):
 
       # Backpropagation
@@ -129,12 +129,11 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg
 
       if is_neg_loss:
           loss = -1*loss
-      is_last_epoch = (num_epochs - 1 ) == epoch or (loss < threshold)
+      is_last_epoch = (num_epochs - 1 ) == epoch
 
-      if torch.abs(prev_loss - loss) < 0.00000001:
-          pass
-          print('converged!')
-          #break
+      if torch.abs(prev_loss - loss) < 0.000000001:
+          print('converged! in ', epoch, ' with loss: ', loss)
+          break
       prev_loss = loss
 
       loss.backward()
@@ -145,13 +144,14 @@ def train_loop(data_x, data_y, model, loss_fn, optimizer, num_epochs=100, is_neg
           scheduler.step()
 
 
-      if epoch % (1000 + 0*num_epochs) == 0:
+      if (epoch) % (1000 + 0*num_epochs) == 0:
         loss = loss.item()
-        print(f"{ epoch } loss: {loss:>7f}]")
+        print(f"{ epoch} loss: {loss:>7f}]")
 
       if(is_last_epoch):
           return True
 
+    print(f"{ num_epochs } loss: {loss:>7f}]")
 
 def createSyntheticData(num_data_points=10):
     #following the defination specified in the paper.
